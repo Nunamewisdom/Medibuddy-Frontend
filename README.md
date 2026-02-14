@@ -14,3 +14,16 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## OTP Development Mode
+
+For development, OTP is not sent via SMS.
+
+Instead, when requesting an OTP:
+
+1. Click "Send OTP"
+2. Check backend terminal
+3. Copy the OTP printed in the console
+4. Enter it in the verify page
+
+Twilio is disabled in development to avoid SMS charges.
