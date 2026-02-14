@@ -2,6 +2,8 @@
 
 This is the React (Vite) frontend for the MediBuddy Healthcare System.
 
+---
+
 ## Installation
 
 1. Clone the repository:
@@ -21,12 +23,33 @@ This is the React (Vite) frontend for the MediBuddy Healthcare System.
    npm run dev
 
 Frontend runs at:
+
 http://localhost:5173
+
+---
 
 ## Backend Requirement
 
 Make sure backend is running at:
+
 http://localhost:5000
+
+---
+
+## OTP Development Mode
+
+For development, OTP is NOT sent via SMS.
+
+Instead:
+
+1. Click "Send OTP"
+2. Check backend terminal
+3. Copy the OTP printed in the console
+4. Enter it in the verify page
+
+Twilio is disabled in development to avoid SMS charges.
+
+---
 
 ## Features
 
