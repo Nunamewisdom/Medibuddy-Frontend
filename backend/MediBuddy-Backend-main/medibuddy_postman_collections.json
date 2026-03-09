@@ -1,0 +1,1298 @@
+{
+	"info": {
+		"_postman_id": "medibuddy-backend-api",
+		"name": "MediBuddy API",
+		"description": "MediBuddy REST API - A secure, mobile-first health management app that helps users track medications, log symptoms, prepare consultation summaries, and support caregivers with privacy-focused tools.\n\n## Getting Started\n\n1. **Set `baseUrl`** to your running server (default: `http://localhost:3000/api`).\n2. **Request an OTP** via `Auth > Request OTP`.\n3. **Verify OTP** via `Auth > Verify OTP` — the access and refresh tokens are saved automatically.\n4. **Create a Profile** — the `profileId` is saved automatically.\n5. All authenticated requests inherit the Bearer token from the collection.\n\n## Variables\n\n| Variable | Description |\n|----------|-------------|\n| `baseUrl` | API base URL (default `http://localhost:3000/api`) |\n| `accessToken` | JWT access token (auto-set by Verify OTP) |\n| `refreshToken` | JWT refresh token (auto-set by Verify OTP) |\n| `profileId` | Current profile ID (auto-set by Create Profile) |\n| `medId` | Current medication ID (auto-set by Create Medication) |\n| `reminderId` | A reminder event ID |\n| `summaryId` | A summary ID (auto-set by Generate Summary) |\n| `caregiverId` | A caregiver ID (auto-set by Add Caregiver) |\n| `appointmentId` | An appointment ID (auto-set by Create Appointment) |\n| `metricId` | A health metric ID (auto-set by Add Health Metric) |\n| `conversationId` | A conversation ID |\n| `messageId` | A message ID |\n| `recipientId` | User ID of message recipient |\n| `phone` | Test phone number |",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [""]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [""]
+			}
+		}
+	],
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:3000/api", "type": "string" },
+		{ "key": "accessToken", "value": "", "type": "string" },
+		{ "key": "refreshToken", "value": "", "type": "string" },
+		{ "key": "profileId", "value": "", "type": "string" },
+		{ "key": "medId", "value": "", "type": "string" },
+		{ "key": "reminderId", "value": "", "type": "string" },
+		{ "key": "summaryId", "value": "", "type": "string" },
+		{ "key": "caregiverId", "value": "", "type": "string" },
+		{ "key": "appointmentId", "value": "", "type": "string" },
+		{ "key": "metricId", "value": "", "type": "string" },
+		{ "key": "conversationId", "value": "", "type": "string" },
+		{ "key": "messageId", "value": "", "type": "string" },
+		{ "key": "recipientId", "value": "", "type": "string" },
+		{ "key": "phone", "value": "+2348012345678", "type": "string" },
+		{ "key": "requestId", "value": "", "type": "string" }
+	],
+	"item": [
+		{
+			"name": "Health",
+			"description": "System health check endpoint. No authentication required.",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Returns system health status including MongoDB connection, Redis connection, and server uptime."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test('Health check returns success', function () {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json.success).to.be.true;",
+									"    pm.expect(json.data.status).to.eql('ok');",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Auth",
+			"description": "Authentication endpoints: OTP-based phone auth, token refresh, consent, and account deletion.\n\nFlow: Request OTP → Verify OTP → Use access token for all other requests.",
+			"item": [
+				{
+					"name": "Request OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phone\": \"{{phone}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "otp"]
+						},
+						"auth": { "type": "noauth" },
+						"description": "Request a 6-digit OTP for phone verification. Rate limited to 5 requests per 10 minutes.\n\nIn development mode, the OTP is logged to the server console."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('OTP requested successfully', function () {",
+									"    pm.response.to.have.status(200);",
+									"    const json = pm.response.json();",
+									"    pm.expect(json.success).to.be.true;",
+									"    if (json.data && json.data.requestId) {",
+									"        pm.collectionVariables.set('requestId', json.data.requestId);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"requestId\": \"{{requestId}}\",\n  \"otp\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/verify",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "verify"]
+						},
+						"auth": { "type": "noauth" },
+						"description": "Verify the 6-digit OTP. Returns JWT access token (15 min) and refresh token (30 days).\n\nReplace the `otp` value with the code from the server console (dev mode)."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('OTP verified, tokens saved', function () {",
+									"    pm.response.to.have.status(200);",
+									"    const json = pm.response.json();",
+									"    pm.expect(json.success).to.be.true;",
+									"    if (json.data) {",
+									"        pm.collectionVariables.set('accessToken', json.data.accessToken);",
+									"        pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/refresh",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "refresh"]
+						},
+						"auth": { "type": "noauth" },
+						"description": "Exchange a valid refresh token for a new access token."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Token refreshed', function () {",
+									"    pm.response.to.have.status(200);",
+									"    const json = pm.response.json();",
+									"    if (json.data && json.data.accessToken) {",
+									"        pm.collectionVariables.set('accessToken', json.data.accessToken);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/logout",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "logout"]
+						},
+						"description": "Revoke the current refresh token. Auth header is optional but recommended."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Consent",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"accepted\": true,\n  \"version\": \"1.0\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/consent",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "consent"]
+						},
+						"description": "Record user consent acceptance with a version string."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Account",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/auth/account",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "account"]
+						},
+						"description": "Soft-delete the authenticated user's account. 30-day grace period before permanent deletion."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Profiles",
+			"description": "Patient/family member profiles. Each user can have multiple profiles (self, family members).",
+			"item": [
+				{
+					"name": "List Profiles",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles"]
+						},
+						"description": "List all profiles owned by the authenticated user."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Profile",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Idempotency-Key", "value": "{{$guid}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"John Doe\",\n  \"dob\": \"1990-06-15T00:00:00.000Z\",\n  \"relation\": \"self\",\n  \"conditions\": [\"hypertension\", \"diabetes\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/profiles",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles"]
+						},
+						"description": "Create a new profile.\n\n**relation**: `self`, `family`, or `other` (default: `self`).\n\n**Idempotency-Key** header prevents duplicate creation on retries."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Profile created', function () {",
+									"    const status = pm.response.code;",
+									"    pm.expect([200, 201]).to.include(status);",
+									"    const json = pm.response.json();",
+									"    if (json.data && json.data._id) {",
+									"        pm.collectionVariables.set('profileId', json.data._id);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}"]
+						},
+						"description": "Get a specific profile by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"John Doe Updated\",\n  \"conditions\": [\"hypertension\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}"]
+						},
+						"description": "Update a profile. All fields are optional."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Profile",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}"]
+						},
+						"description": "Soft-delete a profile."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Medications",
+			"description": "Medication management for a profile. Creating or updating a medication automatically schedules/reschedules reminder jobs.",
+			"item": [
+				{
+					"name": "List Medications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/medications",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "medications"]
+						},
+						"description": "List all active (non-deleted) medications for a profile."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Medication",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Idempotency-Key", "value": "{{$guid}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Metformin\",\n  \"dosage\": \"500mg\",\n  \"times\": [\"08:00\", \"20:00\"],\n  \"timezone\": \"Africa/Lagos\",\n  \"channels\": [\"push\"],\n  \"startDate\": \"2026-02-13T00:00:00.000Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/medications",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "medications"]
+						},
+						"description": "Create a medication and schedule reminder jobs.\n\n**times**: Array of `HH:mm` strings.\n**timezone**: IANA timezone (default: `Africa/Lagos`).\n**channels**: `push` and/or `sms`."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Medication created', function () {",
+									"    const status = pm.response.code;",
+									"    pm.expect([200, 201]).to.include(status);",
+									"    const json = pm.response.json();",
+									"    if (json.data && json.data._id) {",
+									"        pm.collectionVariables.set('medId', json.data._id);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get Medication",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/medications/{{medId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "medications", "{{medId}}"]
+						},
+						"description": "Get a single medication by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Medication",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"dosage\": \"1000mg\",\n  \"times\": [\"08:00\", \"14:00\", \"20:00\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/medications/{{medId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "medications", "{{medId}}"]
+						},
+						"description": "Update a medication. Reminders are cancelled and rescheduled automatically."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Medication",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/medications/{{medId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "medications", "{{medId}}"]
+						},
+						"description": "Soft-delete a medication and cancel its scheduled reminders."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Symptoms",
+			"description": "Symptom logging for a profile. Supports date range filtering and pagination.",
+			"item": [
+				{
+					"name": "List Symptoms",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/symptoms?limit=50&offset=0",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "symptoms"],
+							"query": [
+								{ "key": "limit", "value": "50", "description": "Max results (1-100, default: 50)" },
+								{ "key": "offset", "value": "0", "description": "Skip N results (default: 0)" },
+								{ "key": "start", "value": "", "description": "ISO 8601 start date filter", "disabled": true },
+								{ "key": "end", "value": "", "description": "ISO 8601 end date filter", "disabled": true }
+							]
+						},
+						"description": "List symptom logs for a profile with optional date range filtering and pagination."
+					},
+					"response": []
+				},
+				{
+					"name": "Log Symptom",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Idempotency-Key", "value": "{{$guid}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"symptom\": \"Headache\",\n  \"severity\": 3,\n  \"duration\": \"2 hours\",\n  \"notes\": \"Started after lunch, mild throbbing pain\",\n  \"clientTs\": \"2026-02-13T14:30:00.000Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/symptoms",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "symptoms"]
+						},
+						"description": "Log a new symptom.\n\n**severity**: 1 (mild) to 5 (severe).\n**clientTs**: Required ISO 8601 timestamp from the client."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Reminders",
+			"description": "Medication reminder events. Reminders are created automatically by the job scheduler. Clients acknowledge them via the ack endpoint.",
+			"item": [
+				{
+					"name": "List Reminders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/reminders",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "reminders"]
+						},
+						"description": "List reminder events for a profile (24 hours ago through 24 hours ahead). Includes medication details."
+					},
+					"response": []
+				},
+				{
+					"name": "Acknowledge Reminder",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Idempotency-Key", "value": "{{$guid}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action\": \"taken\",\n  \"deviceId\": \"device-001\",\n  \"clientTs\": \"2026-02-13T08:05:00.000Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/reminders/{{reminderId}}/ack",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "reminders", "{{reminderId}}", "ack"]
+						},
+						"description": "Acknowledge a reminder event.\n\n**action**: `taken`, `snooze`, or `skip`."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Summaries",
+			"description": "Consultation summaries with PDF generation. Aggregates medications, symptoms, and adherence data for a date range.",
+			"item": [
+				{
+					"name": "Generate Summary",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"startDate\": \"2026-01-01T00:00:00.000Z\",\n  \"endDate\": \"2026-02-13T23:59:59.000Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/summaries",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "summaries"]
+						},
+						"description": "Generate a consultation summary PDF for the given date range. Returns metadata with a download URL."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Summary generated', function () {",
+									"    const status = pm.response.code;",
+									"    pm.expect([200, 201]).to.include(status);",
+									"    const json = pm.response.json();",
+									"    if (json.data && json.data.id) {",
+									"        pm.collectionVariables.set('summaryId', json.data.id);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "List Summaries",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/summaries",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "summaries"]
+						},
+						"description": "List all consultation summaries for a profile."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Summary",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/summaries/{{summaryId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "summaries", "{{summaryId}}"]
+						},
+						"description": "Get a specific summary by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Download Summary PDF",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/summaries/{{summaryId}}/download",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "summaries", "{{summaryId}}", "download"]
+						},
+						"description": "Download the consultation summary as a PDF file."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Caregivers",
+			"description": "Caregiver management for a profile. Caregivers receive SMS alerts when medication reminders are missed.",
+			"item": [
+				{
+					"name": "List Caregivers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/caregivers",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "caregivers"]
+						},
+						"description": "List all active caregivers for a profile."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Caregiver",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Jane Doe\",\n  \"phone\": \"+2348098765432\",\n  \"relation\": \"spouse\",\n  \"alertOnMissedDose\": true,\n  \"alertThresholdMinutes\": 30\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/caregivers",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "caregivers"]
+						},
+						"description": "Add a caregiver to a profile.\n\n**alertThresholdMinutes**: Minutes after a missed dose before alert is sent (5-120, default: 30)."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Caregiver added', function () {",
+									"    const status = pm.response.code;",
+									"    pm.expect([200, 201]).to.include(status);",
+									"    const json = pm.response.json();",
+									"    if (json.data && json.data._id) {",
+									"        pm.collectionVariables.set('caregiverId', json.data._id);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Update Caregiver",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"alertThresholdMinutes\": 60\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/caregivers/{{caregiverId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "caregivers", "{{caregiverId}}"]
+						},
+						"description": "Update a caregiver. All fields are optional."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Caregiver",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/profiles/{{profileId}}/caregivers/{{caregiverId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["profiles", "{{profileId}}", "caregivers", "{{caregiverId}}"]
+						},
+						"description": "Soft-delete a caregiver (sets isActive to false)."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Sync",
+			"description": "Offline sync endpoints. Allows clients to batch operations made while offline and pull server changes.\n\nRate limited to 30 requests per 5 minutes.",
+			"item": [
+				{
+					"name": "Batch Sync",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"operations\": [\n    {\n      \"type\": \"symptom_log\",\n      \"payload\": {\n        \"profileId\": \"{{profileId}}\",\n        \"symptom\": \"Nausea\",\n        \"severity\": 2,\n        \"clientTs\": \"2026-02-13T10:00:00.000Z\"\n      },\n      \"idempotencyKey\": \"sync-001\",\n      \"clientId\": \"offline-symptom-1\",\n      \"clientTs\": \"2026-02-13T10:00:00.000Z\"\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/sync/batch",
+							"host": ["{{baseUrl}}"],
+							"path": ["sync", "batch"]
+						},
+						"description": "Process a batch of client operations created while offline.\n\n**type**: `symptom_log`, `reminder_ack`, or `medication_create`.\n\nMax 100 operations per batch."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Changes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/sync/changes?since=2026-02-12T00:00:00.000Z&limit=100",
+							"host": ["{{baseUrl}}"],
+							"path": ["sync", "changes"],
+							"query": [
+								{ "key": "since", "value": "2026-02-12T00:00:00.000Z", "description": "ISO 8601 timestamp — get changes after this time (required)" },
+								{ "key": "limit", "value": "100", "description": "Max results (1-500, default: 100)" }
+							]
+						},
+						"description": "Get server-side changes since a timestamp. Used to sync the local client database."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Push Notifications",
+			"description": "Web push notification management using VAPID/web-push.",
+			"item": [
+				{
+					"name": "Get Public Key",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/push/public-key",
+							"host": ["{{baseUrl}}"],
+							"path": ["push", "public-key"]
+						},
+						"auth": { "type": "noauth" },
+						"description": "Get the VAPID public key. Used client-side to create a PushSubscription."
+					},
+					"response": []
+				},
+				{
+					"name": "Subscribe",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"subscription\": {\n    \"endpoint\": \"https://fcm.googleapis.com/fcm/send/example\",\n    \"keys\": {\n      \"p256dh\": \"your-p256dh-key\",\n      \"auth\": \"your-auth-key\"\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/push/subscribe",
+							"host": ["{{baseUrl}}"],
+							"path": ["push", "subscribe"]
+						},
+						"description": "Save a browser PushSubscription on the user document. Replace the example values with a real subscription from the browser Push API."
+					},
+					"response": []
+				},
+				{
+					"name": "Unsubscribe",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/push/unsubscribe",
+							"host": ["{{baseUrl}}"],
+							"path": ["push", "unsubscribe"]
+						},
+						"description": "Remove the stored PushSubscription from the user document."
+					},
+					"response": []
+				},
+				{
+					"name": "Test Push",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/push/test",
+							"host": ["{{baseUrl}}"],
+							"path": ["push", "test"]
+						},
+						"description": "Send a test push notification to the authenticated user. Requires a saved subscription."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Appointments",
+			"description": "Appointment scheduling and management for a profile.",
+			"item": [
+				{
+					"name": "List Appointments",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{profileId}}?limit=20&page=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{profileId}}"],
+							"query": [
+								{ "key": "limit", "value": "20", "description": "Max results per page (default: 20)" },
+								{ "key": "page", "value": "1", "description": "Page number (default: 1)" },
+								{ "key": "status", "value": "", "description": "Filter by status", "disabled": true },
+								{ "key": "upcoming", "value": "true", "description": "Only future scheduled/confirmed", "disabled": true },
+								{ "key": "past", "value": "", "description": "Only past appointments", "disabled": true }
+							]
+						},
+						"description": "Get all appointments for a profile with pagination and optional filtering."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Upcoming Appointments",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{profileId}}/upcoming?days=7",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{profileId}}", "upcoming"],
+							"query": [
+								{ "key": "days", "value": "7", "description": "Number of days ahead to look (default: 7)" }
+							]
+						},
+						"description": "Get upcoming appointments within the next N days."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Appointment",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{profileId}}/{{appointmentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{profileId}}", "{{appointmentId}}"]
+						},
+						"description": "Get a single appointment by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Appointment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"doctor\": {\n    \"name\": \"Dr. Sarah Chen\",\n    \"specialty\": \"Endocrinology\",\n    \"phone\": \"+2348055556666\"\n  },\n  \"title\": \"Diabetes follow-up\",\n  \"dateTime\": \"2026-02-20T10:00:00.000Z\",\n  \"duration\": 30,\n  \"location\": \"Lagos University Teaching Hospital\",\n  \"type\": \"in-person\",\n  \"notes\": \"Bring recent blood work results\",\n  \"reminders\": [\n    { \"type\": \"push\", \"minutesBefore\": 60 },\n    { \"type\": \"push\", \"minutesBefore\": 1440 }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{profileId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{profileId}}"]
+						},
+						"description": "Create a new appointment.\n\n**doctor.name** and **dateTime** are required.\n**duration**: Minutes (default: 30).\n**type**: e.g. `in-person`, `telemedicine`."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Appointment created', function () {",
+									"    const status = pm.response.code;",
+									"    pm.expect([200, 201]).to.include(status);",
+									"    const json = pm.response.json();",
+									"    if (json.data && json.data._id) {",
+									"        pm.collectionVariables.set('appointmentId', json.data._id);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Update Appointment",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"dateTime\": \"2026-02-21T14:00:00.000Z\",\n  \"notes\": \"Rescheduled to afternoon slot\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{profileId}}/{{appointmentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{profileId}}", "{{appointmentId}}"]
+						},
+						"description": "Update an appointment. All fields are optional."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Appointment Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"confirmed\",\n  \"notes\": \"Confirmed via phone call\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{profileId}}/{{appointmentId}}/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{profileId}}", "{{appointmentId}}", "status"]
+						},
+						"description": "Update only the status of an appointment.\n\n**status**: `scheduled`, `confirmed`, `completed`, `cancelled`, or `no-show`."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Appointment",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/appointments/{{profileId}}/{{appointmentId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["appointments", "{{profileId}}", "{{appointmentId}}"]
+						},
+						"description": "Permanently delete an appointment."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Health Metrics",
+			"description": "Health metrics tracking: steps, sleep, weight, heart rate, blood pressure, glucose. Supports trends and batch imports.",
+			"item": [
+				{
+					"name": "List Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health-metrics/{{profileId}}?limit=50",
+							"host": ["{{baseUrl}}"],
+							"path": ["health-metrics", "{{profileId}}"],
+							"query": [
+								{ "key": "limit", "value": "50", "description": "Max results (default: 50)" },
+								{ "key": "type", "value": "", "description": "Filter by metric type", "disabled": true },
+								{ "key": "startDate", "value": "", "description": "ISO date start filter", "disabled": true },
+								{ "key": "endDate", "value": "", "description": "ISO date end filter", "disabled": true }
+							]
+						},
+						"description": "List health metrics for a profile with optional type and date filters."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Latest Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health-metrics/{{profileId}}/latest",
+							"host": ["{{baseUrl}}"],
+							"path": ["health-metrics", "{{profileId}}", "latest"]
+						},
+						"description": "Get the most recent metric of each type (steps, sleep, weight, heart_rate)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Trends",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health-metrics/{{profileId}}/trends?type=steps&days=7",
+							"host": ["{{baseUrl}}"],
+							"path": ["health-metrics", "{{profileId}}", "trends"],
+							"query": [
+								{ "key": "type", "value": "steps", "description": "Metric type (default: steps)" },
+								{ "key": "days", "value": "7", "description": "Number of days to aggregate (default: 7)" }
+							]
+						},
+						"description": "Get trend/aggregation data for a specific metric type over N days."
+					},
+					"response": []
+				},
+				{
+					"name": "Add Health Metric",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"type\": \"weight\",\n  \"value\": 75.5,\n  \"unit\": \"kg\",\n  \"recordedAt\": \"2026-02-13T07:00:00.000Z\",\n  \"notes\": \"Morning weight\",\n  \"source\": \"manual\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/health-metrics/{{profileId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["health-metrics", "{{profileId}}"]
+						},
+						"description": "Add a single health metric.\n\n**type**: `steps`, `sleep`, `weight`, `heart_rate`, `blood_pressure`, or `glucose`.\n**source**: e.g. `manual`, `fitbit`, `apple_health`."
+					},
+					"response": [],
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Metric added', function () {",
+									"    const status = pm.response.code;",
+									"    pm.expect([200, 201]).to.include(status);",
+									"    const json = pm.response.json();",
+									"    if (json.data && json.data._id) {",
+									"        pm.collectionVariables.set('metricId', json.data._id);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Batch Add Metrics",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"metrics\": [\n    {\n      \"type\": \"steps\",\n      \"value\": 8500,\n      \"recordedAt\": \"2026-02-12T23:59:00.000Z\",\n      \"source\": \"fitbit\"\n    },\n    {\n      \"type\": \"heart_rate\",\n      \"value\": 72,\n      \"unit\": \"bpm\",\n      \"recordedAt\": \"2026-02-13T08:00:00.000Z\",\n      \"source\": \"fitbit\"\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/health-metrics/{{profileId}}/batch",
+							"host": ["{{baseUrl}}"],
+							"path": ["health-metrics", "{{profileId}}", "batch"]
+						},
+						"description": "Add multiple health metrics in a single request. Useful for syncing data from wearable devices."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Metric",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"value\": 76.0,\n  \"notes\": \"Corrected measurement\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/health-metrics/{{profileId}}/{{metricId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["health-metrics", "{{profileId}}", "{{metricId}}"]
+						},
+						"description": "Update a health metric."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Metric",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health-metrics/{{profileId}}/{{metricId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["health-metrics", "{{profileId}}", "{{metricId}}"]
+						},
+						"description": "Permanently delete a health metric."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Messages",
+			"description": "In-app messaging system. Supports conversations, system messages (medication alerts, symptom alerts), and read receipts.",
+			"item": [
+				{
+					"name": "List Conversations",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/messages/conversations?limit=20",
+							"host": ["{{baseUrl}}"],
+							"path": ["messages", "conversations"],
+							"query": [
+								{ "key": "limit", "value": "20", "description": "Max results (default: 20)" }
+							]
+						},
+						"description": "Get the authenticated user's conversation list."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Unread Count",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/messages/unread",
+							"host": ["{{baseUrl}}"],
+							"path": ["messages", "unread"]
+						},
+						"description": "Get the total count of unread messages."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Conversation Messages",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/messages/conversation/{{conversationId}}?page=1&limit=50",
+							"host": ["{{baseUrl}}"],
+							"path": ["messages", "conversation", "{{conversationId}}"],
+							"query": [
+								{ "key": "page", "value": "1" },
+								{ "key": "limit", "value": "50" }
+							]
+						},
+						"description": "Get messages in a conversation. Automatically marks messages as read."
+					},
+					"response": []
+				},
+				{
+					"name": "Send Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"recipientId\": \"{{recipientId}}\",\n  \"profileId\": \"{{profileId}}\",\n  \"content\": \"Hello, just checking in about the medication schedule.\",\n  \"type\": \"text\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/messages",
+							"host": ["{{baseUrl}}"],
+							"path": ["messages"]
+						},
+						"description": "Send a new message to another user."
+					},
+					"response": []
+				},
+				{
+					"name": "Send System Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"recipientId\": \"{{recipientId}}\",\n  \"profileId\": \"{{profileId}}\",\n  \"type\": \"medication_update\",\n  \"metadata\": {\n    \"medicationName\": \"Metformin\",\n    \"change\": \"dosage_updated\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/messages/system",
+							"host": ["{{baseUrl}}"],
+							"path": ["messages", "system"]
+						},
+						"description": "Create a system-generated message.\n\n**type**: `medication_update`, `symptom_alert`, `summary_shared`, etc."
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Conversation Read",
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/messages/conversation/{{conversationId}}/read",
+							"host": ["{{baseUrl}}"],
+							"path": ["messages", "conversation", "{{conversationId}}", "read"]
+						},
+						"description": "Mark all messages in a conversation as read."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Message",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/messages/{{messageId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["messages", "{{messageId}}"]
+						},
+						"description": "Soft-delete a message. Content is replaced with '[Message deleted]'."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin",
+			"description": "Admin-only endpoints. Requires the authenticated user to have `role: 'admin'` in the database.",
+			"item": [
+				{
+					"name": "Get System Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/admin/metrics",
+							"host": ["{{baseUrl}}"],
+							"path": ["admin", "metrics"]
+						},
+						"description": "Get system and domain metrics: uptime, memory usage, MongoDB collection counts.\n\nRequires admin role."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
