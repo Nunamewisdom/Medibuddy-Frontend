@@ -5,7 +5,8 @@ import Dashboard from "../pages/Dashboard";
 import Profiles from "../pages/Profiles";
 import Medications from "../pages/Medications";
 import Appointments from "../pages/Appointments";
-import RequireAuth from "../auth/RequireAuth";
+import ProtectedRoute from "./ProtectedRoute";
+import ProtectedLayout from "../layouts/ProtectedLayout";
 
 export default function AppRoutes() {
   return (
@@ -14,40 +15,17 @@ export default function AppRoutes() {
       <Route path="/verify" element={<VerifyOtp />} />
 
       <Route
-        path="/"
         element={
-          <RequireAuth>
-            <Dashboard />
-          </RequireAuth>
+          <ProtectedRoute>
+            <ProtectedLayout />
+          </ProtectedRoute>
         }
-      />
-
-      <Route
-        path="/profiles"
-        element={
-          <RequireAuth>
-            <Profiles />
-          </RequireAuth>
-        }
-      />
-
-      <Route
-        path="/medications"
-        element={
-          <RequireAuth>
-            <Medications />
-          </RequireAuth>
-        }
-      />
-
-      <Route
-        path="/appointments"
-        element={
-          <RequireAuth>
-            <Appointments />
-          </RequireAuth>
-        }
-      />
+      >
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/profiles" element={<Profiles />} />
+        <Route path="/medications" element={<Medications />} />
+        <Route path="/appointments" element={<Appointments />} />
+      </Route>
     </Routes>
   );
 }

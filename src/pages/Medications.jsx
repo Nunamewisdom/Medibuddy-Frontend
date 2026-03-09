@@ -1,87 +1,96 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useProfile } from "../context/ProfileContext";
+import {
+  getMedications,
+  createMedication,
+  deleteMedication
+} from "../api/medications";
 
 export default function Medications() {
+  const { activeProfile } = useProfile();
   const [medications, setMedications] = useState([]);
-  const [form, setForm] = useState({
-    name: "",
-    dosage: "",
-    time: ""
-  });
-  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({ name: "", dosage: "" });
+  const [error, setError] = useState("");
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const loadMedications = async () => {
+    if (!activeProfile) return;
+    const data = await getMedications(activeProfile._id);
+    setMedications(data);
   };
 
-  const handleSubmit = () => {
-    if (!form.name || !form.dosage || !form.time) return;
+  useEffect(() => {
+    loadMedications();
+  }, [activeProfile]);
 
-    if (editingId) {
-      setMedications(
-        medications.map((m) =>
-          m.id === editingId ? { ...m, ...form } : m
-        )
-      );
-      setEditingId(null);
-    } else {
-      setMedications([
-        ...medications,
-        { id: Date.now(), ...form }
-      ]);
+  const handleSubmit = async () => {
+    if (!activeProfile) {
+      setError("Please select a profile first.");
+      return;
     }
 
-    setForm({ name: "", dosage: "", time: "" });
+    if (!form.name) {
+      setError("Medication name is required.");
+      return;
+    }
+
+    await createMedication(activeProfile._id, form);
+    setForm({ name: "", dosage: "" });
+    setError("");
+    loadMedications();
   };
 
-  const handleEdit = (med) => {
-    setForm({
-      name: med.name,
-      dosage: med.dosage,
-      time: med.time
-    });
-    setEditingId(med.id);
+  const handleDelete = async (id) => {
+    await deleteMedication(activeProfile._id, id);
+    loadMedications();
   };
 
-  const handleDelete = (id) => {
-    setMedications(medications.filter((m) => m.id !== id));
-  };
+  if (!activeProfile) {
+    return <h3>Please select a profile first.</h3>;
+  }
 
   return (
     <div>
-      <h1>Medications</h1>
+      <h1>Medications for {activeProfile.name}</h1>
+
+      {error && (
+        <div
+          style={{
+            background: "#fee2e2",
+            color: "#b91c1c",
+            padding: "10px",
+            borderRadius: "6px",
+            marginBottom: "15px"
+          }}
+        >
+          {error}
+        </div>
+      )}
 
       <div style={{ marginBottom: "20px" }}>
         <input
-          name="name"
-          placeholder="Medication Name"
+          placeholder="Name"
           value={form.name}
-          onChange={handleChange}
+          onChange={(e) =>
+            setForm({ ...form, name: e.target.value })
+          }
         />
+
         <input
-          name="dosage"
           placeholder="Dosage"
           value={form.dosage}
-          onChange={handleChange}
+          onChange={(e) =>
+            setForm({ ...form, dosage: e.target.value })
+          }
         />
-        <input
-          name="time"
-          placeholder="Time (e.g. 08:00)"
-          value={form.time}
-          onChange={handleChange}
-        />
-        <button onClick={handleSubmit}>
-          {editingId ? "Update" : "Add"}
-        </button>
+
+        <button onClick={handleSubmit}>Add</button>
       </div>
 
       <ul>
         {medications.map((med) => (
-          <li key={med.id}>
-            {med.name} - {med.dosage} - {med.time}
-            <button onClick={() => handleEdit(med)}>
-              Edit
-            </button>
-            <button onClick={() => handleDelete(med.id)}>
+          <li key={med._id}>
+            {med.name} - {med.dosage}
+            <button onClick={() => handleDelete(med._id)}>
               Delete
             </button>
           </li>

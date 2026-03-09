@@ -1,7 +1,6 @@
-import api from "./index";
+import api from "./api";
 
-export const requestOtp = (phone) =>
-  api.post("/auth/otp", { phone });
-
-export const verifyOtp = (requestId, otp) =>
-  api.post("/auth/verify", { requestId, otp });
+export const requestOtp = async (phone) => {
+  const res = await api.post("/auth/otp", { phone });
+  return res.data.data; // unwrap
+};

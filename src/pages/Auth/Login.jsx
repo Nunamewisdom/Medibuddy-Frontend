@@ -1,6 +1,6 @@
 import { useState } from "react";
-import api from "../../api/api";
 import { useNavigate } from "react-router-dom";
+import { requestOtp } from "../../api/auth";
 
 export default function Login() {
   const [phone, setPhone] = useState("");
@@ -8,18 +8,23 @@ export default function Login() {
   const navigate = useNavigate();
 
   const handleSendOtp = async () => {
-    setLoading(true);
-
     try {
-      const res = await api.post("/auth/otp", { phone });
+      if (!phone) {
+        alert("Please enter phone number");
+        return;
+      }
+
+      setLoading(true);
+
+      const data = await requestOtp(phone);
 
       navigate("/verify", {
-        state: { requestId: res.data.data.requestId }
+        state: { requestId: data.requestId }
       });
 
     } catch (err) {
       console.error(err);
-      alert("Failed to send OTP. Try again.");
+      alert("Failed to send OTP");
     } finally {
       setLoading(false);
     }

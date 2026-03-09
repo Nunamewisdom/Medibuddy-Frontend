@@ -1,49 +1,47 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  getAppointments,
+  createAppointment,
+  updateAppointment,
+  deleteAppointment
+} from "../api/appointments";
 
 export default function Appointments() {
   const [appointments, setAppointments] = useState([]);
-  const [form, setForm] = useState({
-    title: "",
-    date: "",
-    location: ""
-  });
+  const [form, setForm] = useState({ title: "", date: "" });
   const [editingId, setEditingId] = useState(null);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const loadAppointments = async () => {
+    const data = await getAppointments();
+    setAppointments(data);
   };
 
-  const handleSubmit = () => {
-    if (!form.title || !form.date || !form.location) return;
+  useEffect(() => {
+    loadAppointments();
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!form.title) return;
 
     if (editingId) {
-      setAppointments(
-        appointments.map((a) =>
-          a.id === editingId ? { ...a, ...form } : a
-        )
-      );
+      await updateAppointment(editingId, form);
       setEditingId(null);
     } else {
-      setAppointments([
-        ...appointments,
-        { id: Date.now(), ...form }
-      ]);
+      await createAppointment(form);
     }
 
-    setForm({ title: "", date: "", location: "" });
+    setForm({ title: "", date: "" });
+    loadAppointments();
   };
 
   const handleEdit = (appt) => {
-    setForm({
-      title: appt.title,
-      date: appt.date,
-      location: appt.location
-    });
-    setEditingId(appt.id);
+    setForm({ title: appt.title, date: appt.date });
+    setEditingId(appt._id);
   };
 
-  const handleDelete = (id) => {
-    setAppointments(appointments.filter((a) => a.id !== id));
+  const handleDelete = async (id) => {
+    await deleteAppointment(id);
+    loadAppointments();
   };
 
   return (
@@ -52,23 +50,21 @@ export default function Appointments() {
 
       <div style={{ marginBottom: "20px" }}>
         <input
-          name="title"
-          placeholder="Appointment Title"
+          placeholder="Title"
           value={form.title}
-          onChange={handleChange}
+          onChange={(e) =>
+            setForm({ ...form, title: e.target.value })
+          }
         />
+
         <input
-          name="date"
           type="date"
           value={form.date}
-          onChange={handleChange}
+          onChange={(e) =>
+            setForm({ ...form, date: e.target.value })
+          }
         />
-        <input
-          name="location"
-          placeholder="Location"
-          value={form.location}
-          onChange={handleChange}
-        />
+
         <button onClick={handleSubmit}>
           {editingId ? "Update" : "Add"}
         </button>
@@ -76,12 +72,12 @@ export default function Appointments() {
 
       <ul>
         {appointments.map((appt) => (
-          <li key={appt.id}>
-            {appt.title} - {appt.date} - {appt.location}
+          <li key={appt._id}>
+            {appt.title} - {appt.date}
             <button onClick={() => handleEdit(appt)}>
               Edit
             </button>
-            <button onClick={() => handleDelete(appt.id)}>
+            <button onClick={() => handleDelete(appt._id)}>
               Delete
             </button>
           </li>

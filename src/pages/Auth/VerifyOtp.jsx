@@ -1,25 +1,22 @@
 import { useState } from "react";
-import api from "../../api/api";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 export default function VerifyOtp() {
   const [otp, setOtp] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleVerify = async () => {
     try {
-      const res = await api.post("/auth/verify", {
-        requestId: location.state?.requestId,
-        otp: otp
-      });
+      if (!location.state?.requestId) {
+        alert("Session expired. Please request OTP again.");
+        navigate("/login");
+        return;
+      }
 
-      console.log("VERIFY RESPONSE:", res.data); // 👈 Debug
-
-      // 👇 IMPORTANT: Save token correctly
-      const accessToken = res.data.data.accessToken;
-
-      localStorage.setItem("accessToken", accessToken);
+      await login(location.state.requestId, otp);
 
       alert("Login successful!");
       navigate("/");
